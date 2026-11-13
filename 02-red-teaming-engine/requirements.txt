@@ -1,0 +1,15 @@
+# Triad AI Governance Mesh - Adversarial Red Teaming Engine Dependencies
+# Clean-Room Reference Architecture
+
+pyyaml>=6.0.1
+pydantic>=2.7.0
+requests>=2.31.0
+rich>=13.7.1
+typing-extensions>=4.10.0
+pytest>=8.1.0
+
+# Optional production provider SDKs for live multi-cloud evaluation:
+# pyrit>=0.4.0
+# openai>=1.20.0
+# google-genai>=0.1.0
+# boto3>=1.34.0

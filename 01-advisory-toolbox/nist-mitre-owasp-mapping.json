@@ -1,0 +1,169 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "NIST AI RMF - MITRE ATLAS - OWASP Top 10 for LLMs Deterministic Control Mapping",
+  "version": "2.1.0",
+  "author": "Shibin Antony",
+  "repository": "github.com/shibinantony/triad-ai-governance-mesh",
+  "mappings": [
+    {
+      "control_id": "CTRL-LLM-01",
+      "control_name": "Input Prompt Shield & Boundary Isolation",
+      "nist_ai_rmf": {
+        "function": "PROTECT / MANAGE",
+        "subcategory": "MANAGE-1.3",
+        "description": "Mechanisms are in place to prioritize AI risks and apply appropriate risk management interventions to AI inputs."
+      },
+      "mitre_atlas": {
+        "technique_id": "AML.T0051",
+        "technique_name": "LLM Prompt Injection",
+        "tactic": "Execution / Defense Evasion"
+      },
+      "owasp_llm_top10": {
+        "code": "LLM01",
+        "category": "Prompt Injection"
+      },
+      "implementation": {
+        "control_plane_rule": "Deterministic delimiter segregation and multi-turn prompt classifier evaluation before inference forwarding.",
+        "content_plane_action": "Sanitize and strip adversarial delimiter overrides; reject prompts exceeding prompt-shield classifier confidence threshold (>0.75).",
+        "cloud_agnostic_enforcement": {
+          "gcp_model_armor": "Filter: PROMPT_INJECTION_SHIELD (severity: HIGH)",
+          "azure_ai_content_safety": "PromptShield: userPromptAnalysis.riskScore >= 0.75 -> BLOCK",
+          "aws_bedrock_guardrails": "ContextualGroundingFilter: PROMPT_ATTACK (threshold: HIGH)"
+        }
+      },
+      "verification": {
+        "test_harness": "pyrit_adversarial_runner.py",
+        "scenario_ids": ["SCN-INJ-001", "SCN-INJ-002"],
+        "target_asr_threshold": 0.00
+      }
+    },
+    {
+      "control_id": "CTRL-LLM-02",
+      "control_name": "Contextual Egress & Sensitive Data DLP",
+      "nist_ai_rmf": {
+        "function": "MEASURE / MANAGE",
+        "subcategory": "MEASURE-2.6",
+        "description": "AI systems are evaluated for privacy risks and information exposure prior to deployment and in runtime."
+      },
+      "mitre_atlas": {
+        "technique_id": "AML.T0057",
+        "technique_name": "LLM Data Exfiltration",
+        "tactic": "Exfiltration"
+      },
+      "owasp_llm_top10": {
+        "code": "LLM02",
+        "category": "Sensitive Information Disclosure"
+      },
+      "implementation": {
+        "control_plane_rule": "Token output inspection against regex registries and cryptographic canary tokens.",
+        "content_plane_action": "Redact detected PII, API tokens, RSA keys, and halt generation if canary signature matches.",
+        "cloud_agnostic_enforcement": {
+          "gcp_model_armor": "Filter: PII_REDACTION (categories: [EMAIL, SSN, PHONE, API_KEY])",
+          "azure_ai_content_safety": "TextFilter: piiRegexCheck -> REDACT",
+          "aws_bedrock_guardrails": "SensitiveInformationPolicy: PII entities [EMAIL, IP_ADDRESS, US_SSN] -> ANONYMIZE"
+        }
+      },
+      "verification": {
+        "test_harness": "pyrit_adversarial_runner.py",
+        "scenario_ids": ["SCN-EXF-001"],
+        "target_asr_threshold": 0.00
+      }
+    },
+    {
+      "control_id": "CTRL-LLM-03",
+      "control_name": "System Prompt & Model Metadata Hardening",
+      "nist_ai_rmf": {
+        "function": "MAP / PROTECT",
+        "subcategory": "MAP-1.5",
+        "description": "Organizational risk tolerance for AI system confidentiality and proprietary instructions is established."
+      },
+      "mitre_atlas": {
+        "technique_id": "AML.T0058",
+        "technique_name": "System Prompt Extraction",
+        "tactic": "Discovery"
+      },
+      "owasp_llm_top10": {
+        "code": "LLM07",
+        "category": "System Prompt Leakage"
+      },
+      "implementation": {
+        "control_plane_rule": "Zero-trust system role isolation; evaluate output similarity against known system prompt embeddings.",
+        "content_plane_action": "Suppress output if cosine similarity with system prompt text exceeds 0.80.",
+        "cloud_agnostic_enforcement": {
+          "gcp_model_armor": "Filter: PROPRIETARY_TEMPLATE_PROTECTION",
+          "azure_ai_content_safety": "CustomBlocklist: system_prompt_anchors -> BLOCK",
+          "aws_bedrock_guardrails": "WordPolicy: ManagedWords [SYSTEM_PROMPT_SNIPPETS]"
+        }
+      },
+      "verification": {
+        "test_harness": "pyrit_adversarial_runner.py",
+        "scenario_ids": ["SCN-EXT-001"],
+        "target_asr_threshold": 0.00
+      }
+    },
+    {
+      "control_id": "CTRL-LLM-04",
+      "control_name": "Agentic Tool Execution & Identity Boundary Enclosure",
+      "nist_ai_rmf": {
+        "function": "GOVERN / MANAGE",
+        "subcategory": "GOVERN-1.2",
+        "description": "Accountability structures are established for downstream actions taken by automated AI agents."
+      },
+      "mitre_atlas": {
+        "technique_id": "AML.T0053",
+        "technique_name": "LLM Tool Misuse",
+        "tactic": "Execution / Impact"
+      },
+      "owasp_llm_top10": {
+        "code": "LLM06",
+        "category": "Excessive Agency"
+      },
+      "implementation": {
+        "control_plane_rule": "Deterministic schema enforcement, JSON parameter validation, and IAM scoped step-up credential issuance.",
+        "content_plane_action": "Reject tool calls attempting destructive actions (DROP, DELETE, SHELL, WIRE) without external HITL cryptographic token.",
+        "cloud_agnostic_enforcement": {
+          "gcp_model_armor": "PreExecutionHook: validate_tool_schema_and_iam()",
+          "azure_ai_content_safety": "ApiGatewayPolicy: EnforceOAuth2StepUp",
+          "aws_bedrock_guardrails": "ActionGroupInterception: LambdaAuthorizerWithOIDC"
+        }
+      },
+      "verification": {
+        "test_harness": "pyrit_adversarial_runner.py",
+        "scenario_ids": ["SCN-MIS-001"],
+        "target_asr_threshold": 0.00
+      }
+    },
+    {
+      "control_id": "CTRL-LLM-05",
+      "control_name": "Indirect Prompt Injection Ingestion Filtering",
+      "nist_ai_rmf": {
+        "function": "MEASURE / MANAGE",
+        "subcategory": "MEASURE-2.11",
+        "description": "AI systems are monitored and evaluated for vulnerabilities to untrusted third-party multimodal and RAG data."
+      },
+      "mitre_atlas": {
+        "technique_id": "AML.T0051.001",
+        "technique_name": "LLM Prompt Injection: Indirect",
+        "tactic": "Initial Access / Execution"
+      },
+      "owasp_llm_top10": {
+        "code": "LLM01",
+        "category": "Prompt Injection (Indirect)"
+      },
+      "implementation": {
+        "control_plane_rule": "Pre-RAG ingestion scanner for hidden instructions, zero-width spaces, and base64 encoded overrides in retrieved documents.",
+        "content_plane_action": "Sanitize retrieved context chunks through intermediate sanitization proxy prior to prompt synthesis.",
+        "cloud_agnostic_enforcement": {
+          "gcp_model_armor": "ModelArmorTemplate: sanitize_untrusted_documents = true",
+          "azure_ai_content_safety": "PromptShield: documentAnalysis (indirect prompt injection detection enabled)",
+          "aws_bedrock_guardrails": "ContextualGroundingPolicy: Filters untrusted context hallucination / injection"
+        }
+      },
+      "verification": {
+        "test_harness": "pyrit_adversarial_runner.py",
+        "scenario_ids": ["SCN-INJ-002"],
+        "target_asr_threshold": 0.00
+      }
+    }
+  ]
+}

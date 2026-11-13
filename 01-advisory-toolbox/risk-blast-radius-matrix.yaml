@@ -1,0 +1,393 @@
+schema_version: "2.3.0"
+metadata:
+  title: "AI Advisory Capability Matrix & Risk-to-Blast-Radius Evaluation Guide"
+  author: "Shibin Antony"
+  repository: "github.com/shibinantony/triad-ai-governance-mesh"
+  perspective: "Director-level AI Architecture, Strategic Selection, & Value Realization"
+  standards_alignment:
+    - "NIST AI RMF 1.0 (GOVERN, MAP, MEASURE, MANAGE)"
+    - "MITRE ATLAS Enterprise Matrix"
+    - "OWASP Top 10 for Large Language Models (LLM01-LLM10)"
+    - "ISO/IEC 42001:2023 (Artificial Intelligence Management System)"
+    - "EU Artificial Intelligence Act (High-Risk Classification Framework)"
+
+executive_summary: >
+  This advisory matrix helps enterprise leadership move past AI risk paralysis. 
+  Instead of evaluating models in isolation or treating security as an afterthought, 
+  this guide provides an objective capability trade-off framework: how to select 
+  the right governance architecture (Cloud-Native vs. Independent Proxy vs. Embedded Safeguards), 
+  an explicit head-to-head comparison of AWS vs. GCP vs. Azure guardrail tools,
+  how to establish measurable risk boundaries, where an organization should start, and how to 
+  deliver measurable business value without stalling innovation.
+
+# ==============================================================================
+# 1. HYPERSCALER TOOL-BY-TOOL COMPARISON: AWS vs. GCP vs. AZURE
+# ==============================================================================
+hyperscaler_tool_comparison:
+  overview: >
+    A head-to-head architectural evaluation of the primary cloud-native AI safety tools:
+    Amazon Bedrock Guardrails (AWS) vs. Google Cloud Model Armor (GCP) vs. Azure AI Content Safety (Microsoft).
+
+  comparison_matrix:
+    - capability: "Direct Prompt Injection Defense"
+      aws_bedrock_guardrails: "High (Prompt Attack filter evaluates adversarial intent; configurable strength LOW to HIGH)"
+      gcp_model_armor: "High (Integrated Prompt Injection Shield with confidence scoring and automated blocking)"
+      azure_ai_content_safety: "Very High (Prompt Shields for User Prompts; trained specifically on jailbreak patterns)"
+
+    - capability: "Indirect Prompt Injection (RAG / Doc Poisoning)"
+      aws_bedrock_guardrails: "Medium (Mitigated via Contextual Grounding + Prompt Attack filters on RAG context)"
+      gcp_model_armor: "High (Model Armor Template document sanitization scans untrusted context prior to LLM forwarding)"
+      azure_ai_content_safety: "Very High (Dedicated Document Analysis API specifically flags indirect prompt injection in RAG docs)"
+
+    - capability: "Sensitive Information & PII DLP"
+      aws_bedrock_guardrails: "Comprehensive (30+ built-in PII entities; actions: ANONYMIZE or BLOCK; custom regex supported)"
+      gcp_model_armor: "Comprehensive (Backed by Cloud DLP / Sensitive Data Protection; dozens of infoTypes with masking/redaction)"
+      azure_ai_content_safety: "Moderate (PII regex and blocklist patterns; enterprise DLP typically integrates via Microsoft Purview)"
+
+    - capability: "Hallucination & Contextual Grounding"
+      aws_bedrock_guardrails: "Native (Built-in Grounding and Relevance filters with adjustable confidence thresholds 0.0 - 1.0)"
+      gcp_model_armor: "External (Paired with Vertex AI Search Grounding Checks and factuality attribution services)"
+      azure_ai_content_safety: "Native (Groundedness Detection API verifies claims against source reference text)"
+
+    - capability: "Custom Word & Topic Restrictions"
+      aws_bedrock_guardrails: "Excellent (Custom Topic definitions with natural-language negative examples + Managed Profanity Lists)"
+      gcp_model_armor: "High (Custom dictionary blocklists + RAI safety category thresholds: hate, harassment, sexual, dangerous)"
+      azure_ai_content_safety: "High (Custom Blocklists with sub-string or exact matching + 4-tier severity levels 0-7)"
+
+    - capability: "Support for External / Non-Native Models"
+      aws_bedrock_guardrails: "Supported (ApplyGuardrail API allows evaluating inputs/outputs of non-Bedrock models, e.g. SageMaker or self-hosted)"
+      gcp_model_armor: "Supported (Floor Settings and Templates can inspect arbitrary text payloads via Model Armor REST APIs)"
+      azure_ai_content_safety: "Fully Decoupled (Standalone REST/SDK service; inspects any LLM payload from OpenAI, Anthropic, or on-prem)"
+
+    - capability: "Infrastructure-as-Code (IaC) Maturity"
+      aws_bedrock_guardrails: "Mature (Official aws_bedrock_guardrail and version resources in HashiCorp AWS provider)"
+      gcp_model_armor: "Evolving (Supported via google-beta provider and REST templates; organizational Floor Settings)"
+      azure_ai_content_safety: "Mature (Native Terraform azurerm, Bicep, and declarative JSON policy definitions)"
+
+    - capability: "Latency Overhead (Evaluated per Turn)"
+      aws_bedrock_guardrails: "+35ms to +75ms (In-line when using Bedrock Converse API; +80ms via standalone ApplyGuardrail)"
+      gcp_model_armor: "+25ms to +60ms (Optimized within Google network backbone for Vertex AI workloads)"
+      azure_ai_content_safety: "+30ms to +70ms (Fast synchronous scoring endpoints in regional Azure data centers)"
+
+    - capability: "Pricing Model at Scale"
+      aws_bedrock_guardrails: "$0.75 per 1,000 text units evaluated (1 text unit = up to 1,000 characters)"
+      gcp_model_armor: "Tiered consumption based on inspected character volume and Cloud DLP inspection depth"
+      azure_ai_content_safety: "$0.75 - $1.50 per 1,000 text records (Tiered volume discounts available at enterprise scale)"
+
+  tools:
+    aws_bedrock_guardrails:
+      official_name: "Amazon Bedrock Guardrails"
+      hyperscaler: "Amazon Web Services (AWS)"
+      iac_template_path: "03-model-armor-runtime/aws-bedrock-guardrails/guardrail.tf"
+      key_strengths:
+        - "Best-in-class Contextual Grounding verification for RAG architectures."
+        - "Natural language custom topic definitions allow blocking entire conversational domains without writing regex."
+        - "Seamless zero-latency integration when invoking Bedrock foundation models (Claude, Llama, Titan)."
+      key_limitations:
+        - "Standalone ApplyGuardrail API introduces additional network latency when used for external models outside AWS."
+        - "Regex support capped at enterprise quota limits per guardrail."
+      architect_verdict: "Select for AWS-native workloads, Bedrock agent pipelines, and RAG architectures where hallucination grounding is the primary operational concern."
+
+    gcp_model_armor:
+      official_name: "Google Cloud Model Armor"
+      hyperscaler: "Google Cloud Platform (GCP)"
+      iac_template_path: "03-model-armor-runtime/gcp-model-armor/template.tf"
+      key_strengths:
+        - "Backed by Google's industry-leading Cloud DLP / Sensitive Data Protection engine for deep PII inspection."
+        - "Organizational Floor Settings allow enterprise security teams to enforce mandatory guardrail baselines across all GCP projects."
+        - "Integrated seamlessly with Vertex AI Model Garden and Security Command Center."
+      key_limitations:
+        - "Newer service ecosystem compared to Azure Content Safety."
+        - "Grounding checks require pairing with separate Vertex AI Search attribution services."
+      architect_verdict: "Select for GCP-centric enterprises and multi-project organizations requiring centralized, non-bypassable floor settings enforced at the organization node level."
+
+    azure_ai_content_safety:
+      official_name: "Azure AI Content Safety (with Prompt Shields)"
+      hyperscaler: "Microsoft Azure"
+      iac_template_path: "03-model-armor-runtime/azure-content-safety/prompt_shield_policy.json"
+      key_strengths:
+        - "Specialized Prompt Shields with dedicated detection models for direct jailbreaks and indirect RAG poisoning."
+        - "Completely standalone architecture makes it easy to use as an independent inspection service for any upstream LLM."
+        - "Direct synergy with Microsoft Copilot Studio and Azure OpenAI Service."
+      key_limitations:
+        - "PII masking requires custom configuration or pairing with Microsoft Purview."
+        - "Granular multi-category severity thresholds (0-7) require careful calibration to avoid false positives."
+      architect_verdict: "Select for Azure OpenAI deployments, conversational chatbots exposed to public untrusted users, and architectures ingesting untrusted third-party documents."
+
+# ==============================================================================
+# 2. STRATEGIC ARCHITECTURAL PATTERNS: MANAGED VS. INDEPENDENT PROXIES
+# ==============================================================================
+architectural_patterns:
+  pattern_1_cloud_native_guardrails:
+    name: "Cloud-Native Managed Guardrails (AWS / GCP / Azure)"
+    overview: "Hyperscaler-managed safety services (Bedrock Guardrails, Model Armor, Azure Content Safety) managed via cloud IaC."
+    pros:
+      - "Fast time-to-value: Configurable via Terraform/Bicep with zero underlying infrastructure to patch."
+      - "Inherited compliance: Carries provider SOC 2 Type II, ISO 27001, and HIPAA compliance attestations."
+      - "Integrated telemetry: Native event streaming to CloudWatch, Cloud Logging, and Azure Monitor."
+    cons:
+      - "Cloud vendor lock-in: Policy definitions are proprietary and non-portable across multi-cloud estates."
+      - "Black-box classification: Lack of deep visibility into internal heuristic scoring and model false-positive logic."
+      - "Network latency: Adds 30ms-80ms external API roundtrip overhead per turn."
+    cost_profile_at_scale: "Pay-per-request pricing ($0.50 - $1.50 per 1,000 evaluations). Scales linearly with token volume."
+    best_fit: "Single-cloud enterprises needing production-grade compliance floors deployed rapidly with minimal platform ops."
+
+  pattern_2_independent_policy_gateway:
+    name: "Independent Policy-as-Code Gateway / Sidecar Proxy"
+    overview: "A self-hosted, cloud-agnostic interceptor residing in private VPC/K8s enforcing input/output sanitization locally."
+    pros:
+      - "100% Cloud-agnostic: One single policy schema governs OpenAI, Anthropic, Bedrock, Vertex, and open-source models."
+      - "Data sovereignty & zero leakage: Prompts and corporate secrets are sanitized inside your perimeter before touching external APIs."
+      - "Sub-millisecond speed: Local DFA/regex parsing executes in < 5ms without external network hops."
+      - "Full audit control: Raw and sanitized events route to your private security data lake with custom schema."
+    cons:
+      - "Operational ownership: Platform engineering team must maintain proxy availability, updates, and scaling."
+      - "Heuristic maintenance: Security team must maintain threat regexes and blocklists against novel bypasses."
+    cost_profile_at_scale: "Fixed compute overhead (lightweight container instances). Significantly cheaper than cloud APIs at high volume (>10M tokens/day)."
+    best_fit: "Multi-cloud enterprises, financial institutions, defense, and healthcare organizations requiring strict data sovereignty."
+
+  pattern_3_embedded_small_language_model:
+    name: "Embedded Safeguard Models (Meta Llama Guard 3 / NVIDIA NeMo)"
+    overview: "Dedicated small language models (1B - 8B) running in-line to judge prompt safety via semantic inference."
+    pros:
+      - "High contextual nuance: Catches subtle semantic jailbreaks and multi-turn manipulation that regex cannot detect."
+      - "Custom taxonomy: Can be fine-tuned on proprietary corporate policies and domain-specific sensitive terminology."
+    cons:
+      - "Heavy latency penalty: Adds 150ms - 400ms per inference step, impacting conversational UX."
+      - "High GPU resource cost: Requires dedicated GPU infrastructure to host safeguard model instances."
+    cost_profile_at_scale: "High capital/instance cost; requires active GPU capacity planning."
+    best_fit: "Asynchronous offline auditing, complex multi-turn conversational agents with high risk tolerance for latency."
+
+# ==============================================================================
+# 3. WHERE TO START: THE 4-STAGE ENTERPRISE ROLLOUT ROADMAP
+# ==============================================================================
+where_to_start:
+  stage_0_discovery:
+    timeline: "Weeks 1 - 2"
+    focus: "Inventory & Discovery"
+    actions:
+      - "Inventory all shadow and sanctioned generative AI tools across business units."
+      - "Catalog connected data sources (vector stores, ERP, CRM) and tool execution privileges (read vs. write)."
+      - "Assign an initial Risk Blast Radius score to each use case using Section 5."
+
+  stage_1_empirical_baseline:
+    timeline: "Weeks 3 - 4"
+    focus: "Empirical Adversarial Testing"
+    actions:
+      - "Execute the automated PyRIT red teaming runner against existing models in staging."
+      - "Establish an empirical baseline Attack Success Rate (ASR) across OWASP LLM01 - LLM10."
+      - "Present audit-ready evidence to the CISO/CRO to demonstrate current exposure."
+
+  stage_2_runtime_floor:
+    timeline: "Weeks 5 - 6"
+    focus: "Deploy Minimum Policy-as-Code Floor Settings"
+    actions:
+      - "Deploy the non-negotiable runtime guardrail floor (inbound prompt shield + outbound PII masking)."
+      - "Select tool (Bedrock Guardrails vs. Model Armor vs. Azure Content Safety vs. Gateway) based on enterprise cloud topology."
+      - "Enforce fail-closed circuit breakers for applications handling sensitive or regulated data."
+
+  stage_3_identity_enclosure:
+    timeline: "Weeks 7 - 10"
+    focus: "Agentic Tool Identity & HITL Enclosure"
+    actions:
+      - "Strip autonomous agents of static, long-lived API keys."
+      - "Enforce short-lived, per-invocation OIDC step-up tokens for tool execution."
+      - "Deploy dual-custody Human-in-the-Loop approval workflows for high blast-radius actions (e.g. database updates, financial wires)."
+
+# ==============================================================================
+# 4. VALUE REALIZATION FRAMEWORK: THE BUSINESS CASE FOR LEADERSHIP
+# ==============================================================================
+business_value:
+  velocity_enablement:
+    metric: "75% Reduction in AI Security Architecture Review Cycle Time"
+    impact: >
+      Instead of manual, subjective security questionnaires that take 4 to 6 weeks per project,
+      engineering teams self-serve against the standardized Risk-to-Blast-Radius matrix and deploy
+      pre-approved Terraform guardrail templates in under 2 hours.
+  
+  regulatory_insurance:
+    metric: "Defensible Audit Evidence under EU AI Act & SEC Regulations"
+    impact: >
+      Provides board-ready cryptographic verification reports (SHA-256 evidence logs)
+      proving technical compliance with EU AI Act High-Risk requirements, preventing potential fines
+      of up to 7% of global annual turnover.
+
+  cost_optimization:
+    metric: "40% to 60% Reduction in Governance TCO at Scale"
+    impact: >
+      By pairing a lightweight independent policy gateway for high-frequency low-risk filters with
+      cloud-native managed guardrails only where necessary, enterprises avoid runaway per-token inspection fees.
+
+  vendor_leverage:
+    metric: "Zero-Downtime Model Portability"
+    impact: >
+      Separating the governance Control-Plane from underlying model providers allows enterprises
+      to swap models (e.g., from OpenAI to Anthropic or open-source Llama) overnight as pricing changes,
+      without rewriting safety rules.
+
+# ==============================================================================
+# 5. QUANTITATIVE RISK-TO-BLAST-RADIUS SCORING ENGINE
+# ==============================================================================
+technical_attack_vectors:
+  direct_prompt_injection:
+    vector_id: "TAV-01"
+    atlas_mapping: "AML.T0051"
+    owasp_mapping: "LLM01"
+    levels:
+      LOW:
+        score: 2.0
+        description: "Constrained single-turn inputs; structured schema or closed-vocabulary choices."
+      MEDIUM:
+        score: 5.0
+        description: "Open-ended free-text inputs with conversational memory active."
+      HIGH:
+        score: 8.5
+        description: "Multi-modal inputs, system prompt override attempts, and unconstrained user directives."
+
+  indirect_prompt_injection:
+    vector_id: "TAV-02"
+    atlas_mapping: "AML.T0051.001"
+    owasp_mapping: "LLM01"
+    levels:
+      LOW:
+        score: 1.5
+        description: "Zero external ingestion; deterministic, static system context only."
+      MEDIUM:
+        score: 5.5
+        description: "RAG retrieval from internal enterprise documentation with role-based access."
+      HIGH:
+        score: 9.0
+        description: "Unfiltered ingestion of untrusted external web scraping, user emails, or third-party PDFs."
+
+  pii_and_credential_leakage:
+    vector_id: "TAV-03"
+    atlas_mapping: "AML.T0057"
+    owasp_mapping: "LLM02"
+    levels:
+      LOW:
+        score: 1.0
+        description: "Public domain context; zero personal data or secrets processed."
+      MEDIUM:
+        score: 6.0
+        description: "Internal non-regulated corporate telemetry or business communications."
+      HIGH:
+        score: 9.5
+        description: "Regulated PII (GDPR/CCPA), PHI (HIPAA), PCI cardholder data, or API/signing keys in memory."
+
+  hallucinated_tool_calls:
+    vector_id: "TAV-04"
+    atlas_mapping: "AML.T0053"
+    owasp_mapping: "LLM06"
+    levels:
+      LOW:
+        score: 2.0
+        description: "Read-only idempotent tool calling with strict parameter validation."
+      MEDIUM:
+        score: 5.5
+        description: "Scoped API invocation with read/write access to non-critical internal staging services."
+      HIGH:
+        score: 9.5
+        description: "Autonomous tool execution, shell commands, dynamic SQL, or external financial wire APIs."
+
+operational_blast_radius:
+  financial_loss:
+    dimension_id: "OBR-01"
+    levels:
+      LOW:
+        score: 2.0
+        threshold_usd: "< $5,000 USD"
+        description: "Negligible operational impact; recoverable via routine logging."
+      MEDIUM:
+        score: 6.0
+        threshold_usd: "$5,000 - $100,000 USD"
+        description: "Moderate material impact requiring departmental remediation."
+      HIGH:
+        score: 9.5
+        threshold_usd: "> $100,000 USD"
+        description: "Critical enterprise loss, direct treasury exposure, or insolvency risk."
+
+  compliance_breach:
+    dimension_id: "OBR-02"
+    levels:
+      LOW:
+        score: 1.5
+        frameworks: ["Internal Engineering Standards"]
+        description: "No statutory regulatory exposure."
+      MEDIUM:
+        score: 6.0
+        frameworks: ["SOC 2 Type II", "ISO 27001"]
+        description: "Internal control breach requiring corrective action report."
+      HIGH:
+        score: 9.5
+        frameworks: ["EU AI Act High-Risk", "HIPAA", "GDPR Article 83", "SEC Rule 17a-4"]
+        description: "Severe statutory non-compliance, regulatory audits, or fines."
+
+  unauthorized_api_mutation:
+    dimension_id: "OBR-03"
+    levels:
+      LOW:
+        score: 2.0
+        scope: "Read-only GET queries on idempotent endpoints."
+      MEDIUM:
+        score: 5.5
+        scope: "Scoped POST/PUT updates to staging or non-production databases."
+      HIGH:
+        score: 9.5
+        scope: "Destructive DELETE, database drop, production infrastructure mutation, or wire transfer execution."
+
+deterministic_gating_rules:
+  rule_evaluation_order: 1
+  scoring_algorithm: "Composite Risk Score (CRS) = round((technical_attack_vector_avg * 0.50) + (operational_blast_radius_avg * 0.50), 2)"
+  
+  rules:
+    - rule_id: "GATE-CRITICAL-01"
+      condition: "operational_blast_radius.financial_loss == 'HIGH' or operational_blast_radius.compliance_breach == 'HIGH' or operational_blast_radius.unauthorized_api_mutation == 'HIGH'"
+      enforcement:
+        action: "STRICT_BLOCKING"
+        human_in_the_loop: true
+        hitl_requirement: "Dual-custody authorization required prior to prompt forwarding or tool execution."
+        runtime_guardrail_tier: "FORTRESS_TIER"
+        runtime_actions:
+          input_filter: "BLOCK_ON_MEDIUM_CONFIDENCE_INJECTION"
+          output_filter: "REDACT_ALL_PII_AND_HALT_ON_CANARY_FAIL"
+          tool_execution: "IAM_TEMPORARY_STEP_UP_TOKEN"
+        circuit_breaker: "Fail-closed on policy evaluation timeout (> 15ms)."
+
+    - rule_id: "GATE-HIGH-02"
+      condition: "technical_attack_vectors.direct_prompt_injection == 'HIGH' or technical_attack_vectors.indirect_prompt_injection == 'HIGH'"
+      enforcement:
+        action: "STRICT_INTERCEPT"
+        human_in_the_loop: false
+        hitl_requirement: "Automated verification; escalate to HITL on anomalous behavioral deviation."
+        runtime_guardrail_tier: "STRICT_ARMOR"
+        runtime_actions:
+          input_filter: "BLOCK_ON_HIGH_CONFIDENCE_INJECTION"
+          output_filter: "VALIDATE_OUTPUT_SCHEMA_STRICT"
+          tool_execution: "READ_ONLY_ROLE_BOUND"
+        circuit_breaker: "Fail-closed on interceptor unavailability."
+
+    - rule_id: "GATE-MEDIUM-03"
+      condition: "operational_blast_radius_avg >= 4.0 and operational_blast_radius_avg < 7.0"
+      enforcement:
+        action: "MONITOR_AND_MASK"
+        human_in_the_loop: false
+        hitl_requirement: "None"
+        runtime_guardrail_tier: "BALANCED_GUARD"
+        runtime_actions:
+          input_filter: "SANITIZE_PROMPT_PII"
+          output_filter: "MASK_SYNTHETIC_SECRETS"
+          tool_execution: "PREDEFINED_SCOPED_PERMISSIONS"
+        circuit_breaker: "Fail-open to fallback model with sanitization."
+
+    - rule_id: "GATE-LOW-04"
+      condition: "operational_blast_radius_avg < 4.0 and technical_attack_vector_avg < 4.0"
+      enforcement:
+        action: "PERMISSIVE_OBSERVABILITY"
+        human_in_the_loop: false
+        hitl_requirement: "None"
+        runtime_guardrail_tier: "BASELINE_TELEMETRY"
+        runtime_actions:
+          input_filter: "LOG_TELEMETRY_ASYNC"
+          output_filter: "PASS_THROUGH"
+          tool_execution: "STANDARD_SANDBOX"
+        circuit_breaker: "Fail-open with telemetry logging."
